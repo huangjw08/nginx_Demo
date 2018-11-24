@@ -1,71 +1,7 @@
 //
 // Created by root on 18-11-5.
 //
-
-#include <ngx_config.h>
-#include <ngx_core.h>
-#include <ngx_http.h>
-
-static void *ngx_http_mytest_create_loc_conf(ngx_conf_t *cf);
-
-static char* ngx_http_mytest(ngx_conf_t *cf,ngx_command_t *cmd,void *conf);
-static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r);
-
-//建立mytest配置项的参数的结构体
-typedef struct{
-	ngx_str_t my_test;
-//	ngx_http_upstream_conf_t upstream;
-}ngx_http_mytest_conf_t;
-
-
-//建立mytest模块的上下文结构体
-typedef struct{
-	ngx_uint_t my_step;
-}ngx_http_mytest_ctx_t;
-
-static ngx_command_t ngx_http_mytest_commands[]={
-	{
-		ngx_string("mytest"),
-		NGX_HTTP_MAIN_CONF| NGX_HTTP_LOC_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
-		ngx_http_mytest,
-		NGX_HTTP_LOC_CONF_OFFSET,
-		offsetof(ngx_http_mytest_conf_t,my_test),
-//		0,
-		NULL
-	},
-	//以上是一个mytest的配置项。并设置了 ： 该配置项的配置及处理函数
-
-
-
-	ngx_null_command
-};
-
-static ngx_http_module_t ngx_http_mytest_module_ctx={
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-//	NULL,
-	ngx_http_mytest_create_loc_conf,
-	NULL
-};
-
-ngx_module_t ngx_http_mytest_module= {
-	NGX_MODULE_V1,
-	&ngx_http_mytest_module_ctx,
-	ngx_http_mytest_commands,
-	NGX_HTTP_MODULE,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NGX_MODULE_V1_PADDING
-};
+#include "ngx_http_mytest_module.h"
 
 
 static void *ngx_http_mytest_create_loc_conf(ngx_conf_t *cf){
@@ -95,14 +31,31 @@ static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r){
 		return NGX_HTTP_NOT_ALLOWED;
 	}
 
+	//丢弃包体
 	ngx_int_t rc=ngx_http_discard_request_body(r);
 	if (rc!=NGX_OK){
 		return rc;
 	}
+
+	//开始准备向用户发送响应
+
+	//ngx_str_t的初始化宏ngx_string,一次性设置好data和len
 	ngx_str_t type=ngx_string("text/plain");
 
+	//读取nginx.conf中mytest配置项的参数.
 	ngx_http_mytest_conf_t *mytest;
 	mytest=ngx_http_get_module_loc_conf(r,ngx_http_mytest_module);
+
+
+//	r->upstream->conf=&mytest->upstream;
+
+
+//	r->upstream->create_request=mytest_upstream_create_request;
+//	r->upstream->process_header=mytest_upstream_process_header;
+//	r->upstream->finalize_request=mytest_upstream_finalize_request;
+
+
+
 	ngx_str_t response;
 	//mytest->my_test.data获取的是nginx.conf中mytest配置项的参数
 
@@ -112,16 +65,22 @@ static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r){
 		ngx_str_set(&response,r->args.data);
 	}
 
+	//设置返回的状态码
 	r->headers_out.status=NGX_HTTP_OK;
+	//响应包是有包体内容的，需要设置Content-Length长度
 	r->headers_out.content_length_n=response.len;
+	//设置Content-Type
 	r->headers_out.content_type=type;
 
+	//发送HTTP头部
 	rc=ngx_http_send_header(r);
 	if (rc==NGX_ERROR||rc>NGX_OK||r->header_only){
 		return rc;
 	}
 
+	//将内存中的字符串作为包体发送。
 	ngx_buf_t *b;
+	//nginx中采用内存池管理，在请求结束时，内存池分配的内存将被释放 书P102
 	b=ngx_create_temp_buf(r->pool,response.len);
 	if (b==NULL){
 		return NGX_HTTP_INTERNAL_SERVER_ERROR;
