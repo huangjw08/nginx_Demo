@@ -46,7 +46,6 @@ static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r){
 	ngx_http_mytest_conf_t *mytest;
 	mytest=ngx_http_get_module_loc_conf(r,ngx_http_mytest_module);
 
-
 //	r->upstream->conf=&mytest->upstream;
 
 
