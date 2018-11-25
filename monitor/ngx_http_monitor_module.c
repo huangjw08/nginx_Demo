@@ -93,6 +93,8 @@ static ngx_int_t ngx_http_monitor_handler(ngx_http_request_t *r)
     }
     ngx_http_monitor_conf_t *mycf;
     mycf = ngx_http_get_module_loc_conf(r, ngx_http_monitor_module);
+
+
     ngx_int_t isAuth = 0;
     ngx_str_t format = ngx_string("secret=%V");
     ngx_str_t match;
@@ -114,6 +116,8 @@ static ngx_int_t ngx_http_monitor_handler(ngx_http_request_t *r)
 			}
 	    }
 	}
+
+
 	ngx_str_t response;
 	if (isAuth == 1) {
 		ngx_str_set(&response, "secret right");

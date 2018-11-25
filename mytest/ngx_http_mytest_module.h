@@ -39,7 +39,7 @@ typedef struct{
 static ngx_command_t ngx_http_mytest_commands[]={
 	{
 		ngx_string("mytest"),
-		NGX_HTTP_MAIN_CONF| NGX_HTTP_LOC_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+		NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
 		ngx_http_mytest,
 		//存储mytest配置项后面的参数 的数据结构是通过create_loc_conf()负责生成的。 书P119
 		NGX_HTTP_LOC_CONF_OFFSET,
