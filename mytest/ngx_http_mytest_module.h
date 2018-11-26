@@ -31,11 +31,6 @@ typedef struct{
 }ngx_http_mytest_conf_t;
 
 
-//建立mytest模块的上下文结构体
-typedef struct{
-	ngx_uint_t my_step;
-}ngx_http_mytest_ctx_t;
-
 static ngx_command_t ngx_http_mytest_commands[]={
 	{
 		ngx_string("mytest"),

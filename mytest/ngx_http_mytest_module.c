@@ -16,7 +16,7 @@ static void *ngx_http_mytest_create_loc_conf(ngx_conf_t *cf){
 }
 
 
-
+//该方法中的conf 其实就是(ngx_http_mytest_conf_t*) !!
 static char* ngx_http_mytest(ngx_conf_t *cf,ngx_command_t *cmd,void *conf){
 	ngx_http_core_loc_conf_t *clcf;
 	clcf=ngx_http_conf_get_module_loc_conf(cf,ngx_http_core_module);
@@ -64,6 +64,7 @@ static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r){
 		ngx_str_set(&response,r->args.data);
 	}
 
+	//TODO debug nginx.conf中mytest参数
 	ngx_log_error_core(NGX_LOG_DEBUG,r->connection->log,0,"mytest->my_test.len=%d, mytest->mytest=%V",mytest->my_test.len,&mytest->my_test);
 
 
@@ -80,10 +81,11 @@ static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r){
 		return rc;
 	}
 
+	//TODO debug URL中传的raw参数
 	ngx_log_error_core(NGX_LOG_DEBUG,r->connection->log,0,"r->args.len=%d, r->args.data=%s",r->args.len,r->args.data);
 	//不知道为什么response.len总是直接就等于7.....
 	response.len=r->args.len;
-	ngx_log_error_core(NGX_LOG_DEBUG,r->connection->log,0,"response.len=%d, response.data=%s",response.len,response.data);
+
 
 	//将内存中的字符串作为包体发送。
 	ngx_buf_t *b;
@@ -92,6 +94,9 @@ static ngx_int_t ngx_http_mytest_handler(ngx_http_request_t *r){
 	if (b==NULL){
 		return NGX_HTTP_INTERNAL_SERVER_ERROR;
 	}
+
+	//TODO debug response
+	ngx_log_error_core(NGX_LOG_DEBUG,r->connection->log,0,"response.len=%d, response.data=%s",response.len,response.data);
 
 	ngx_memcpy(b->pos,response.data,response.len);
 	b->last=b->pos+response.len;

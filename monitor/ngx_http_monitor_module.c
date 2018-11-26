@@ -100,6 +100,7 @@ static ngx_int_t ngx_http_monitor_handler(ngx_http_request_t *r)
     ngx_str_t match;
     match.len = format.len - 2 + mycf->secret.len;
     match.data = ngx_palloc(r->pool, match.len);
+    //将mycf->secret按照"secret=%V"格式化成字符串，并将其存入match.data中
     ngx_snprintf(match.data, match.len, "secret=%V", &mycf->secret);
     ngx_uint_t i = 0;
     if (r->args.len >= match.len) {
