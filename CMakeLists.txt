@@ -12,7 +12,7 @@ include_directories(/home/hjw/lib/nginx-1.12.2/src/core /home/hjw/lib/nginx-1.12
 
 add_library(nginx_mytest mytest/ngx_http_mytest_module.c mytest/ngx_http_mytest_module.h)
 add_library(nginx_monitor monitor/ngx_http_monitor_module.c)
-add_library(nginx_upstream upstream/ngx_http_mytest_module.c)
+add_library(nginx_upstream upstream/ngx_http_mytest_module.c upstream/ngx_http_mytest_module.h)
 
 add_executable(main main.c )
 
