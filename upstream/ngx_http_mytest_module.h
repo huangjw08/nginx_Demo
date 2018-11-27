@@ -13,6 +13,7 @@ typedef struct {
 	ngx_http_upstream_conf_t upstream;
 } mytest_conf_t;
 
+//请求上下文结构体
 typedef struct {
 	ngx_http_status_t status;
 	ngx_str_t backendServer;
@@ -21,8 +22,14 @@ typedef struct {
 static void *mytest_create_loc_conf(ngx_conf_t *cf);
 static char *mytest_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
 static ngx_int_t mytest_upstream_create_request(ngx_http_request_t *r);
+
+//用来解析HTTP响应行
 static ngx_int_t mytest_upstream_process_status_line(ngx_http_request_t *r);
+
+//用来解析Http响应头部
 static ngx_int_t mytest_upstream_process_header(ngx_http_request_t *r);
+
+
 static void mytest_upstream_finalize_request(ngx_http_request_t *r,
 											 ngx_int_t rc);
 static ngx_int_t mytest_handler(ngx_http_request_t *r);
@@ -67,6 +74,8 @@ ngx_module_t ngx_http_mytest_module = {
 	NGX_MODULE_V1_PADDING
 };
 
+
+//可用来屏蔽后端服务器的响应头？
 static ngx_str_t  mytest_upstream_hide_headers[] =
 {
 	ngx_string("Date"),

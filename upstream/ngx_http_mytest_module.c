@@ -9,6 +9,7 @@ static void *mytest_create_loc_conf(ngx_conf_t *cf){
 		return NULL;
 	}
 
+	//对mytest_conf_t结构中ngx_http_upstream_conf_t类型的各个成员硬编码，超时时间设为1分钟
 	mycf->upstream.connect_timeout = 60000;
 	mycf->upstream.send_timeout = 60000;
 	mycf->upstream.read_timeout = 60000;
@@ -32,10 +33,15 @@ static char *mytest_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child){
 	mytest_conf_t *prev = (mytest_conf_t *)parent;
 	mytest_conf_t *conf = (mytest_conf_t *)child;
 
+
 	ngx_hash_init_t hash;
 	hash.max_size = 100;
 	hash.bucket_size = 1024;
 	hash.name = "proxy_headers_hash";
+
+	/*
+	 * 此处的ngx_http_upstream_hide_headers_hash()必须在merge_loc_conf()中调用
+	 */
 	if(ngx_http_upstream_hide_headers_hash(cf,&conf->upstream, &prev->upstream,mytest_upstream_hide_headers,&hash)!=NGX_OK){
 		return NGX_CONF_ERROR;
 	}
@@ -52,6 +58,7 @@ static ngx_int_t mytest_upstream_create_request(ngx_http_request_t *r){
 
 	ngx_snprintf(b->pos, queryLineLen, (char *)backendQueryLine.data, &r->args);
 
+	//ngx_chain_t类型也要通过r->pool内存池进行分配
 	r->upstream->request_bufs = ngx_alloc_chain_link(r->pool);
 	if(r->upstream->request_bufs == NULL) return NGX_ERROR;
 
@@ -61,31 +68,45 @@ static ngx_int_t mytest_upstream_create_request(ngx_http_request_t *r){
 	r->upstream->request_sent = 0;
 	r->upstream->header_sent = 0;
 
+	//header_hash不可以为0  书P171
 	r->header_hash = 1;
 
 	return NGX_OK;
 }
 
+
+//这个是收到了来自后端服务器的响应后，才调用的这个方法的
 static ngx_int_t mytest_upstream_process_status_line(ngx_http_request_t *r){
 	size_t len;
 	ngx_int_t rc;
 	ngx_http_upstream_t *u;
 
+	//上下文中才会保存多次解析HTTP响应行的状态，首先要取出请求的上下文。
 	mytest_ctx_t *ctx = ngx_http_get_module_ctx(r, ngx_http_mytest_module);
 	if(ctx == NULL) return NGX_ERROR;
 
 	u = r->upstream;
 
+	//上下文传入的参数为： 收到的字符流和上下文ngx_http_status_t结构
 	rc = ngx_http_parse_status_line(r, &u->buffer, &ctx->status);
+
+	//表示还没解析出完整的HTTP响应行，需要接受更多的字符流再进行解析
 	if(rc == NGX_AGAIN) return rc;
+	//返回NGX_ERROR时，表示没有接收到合法的HTTP响应行
 	if(rc == NGX_ERROR){
-		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "upstream sent to valid HTTP/1.0 header");
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "upstream sent no valid HTTP/1.0 header");
 
 		r->http_version = NGX_HTTP_VERSION_9;
 		u->state->status = NGX_HTTP_OK;
 
 		return NGX_OK;
 	}
+
+
+	/**
+	 * 将解析出的信息设置到r->upstream->headers_in结构体,
+	 * 解析完所有包头后，再把headers_in中的成员设置到将要向下游发送的r->headers_out结构体中
+	 */
 
 	if(u->state){
 		u->state->status = ctx->status.code;
