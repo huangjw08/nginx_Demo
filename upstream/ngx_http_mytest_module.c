@@ -104,11 +104,17 @@ static ngx_int_t mytest_upstream_process_status_line(ngx_http_request_t *r){
 
 
 	/**
-	 * 将解析出的信息设置到r->upstream->headers_in结构体,
+	 * 将解析出的信息设置到r->upstream->headers_in 结构体,
 	 * 解析完所有包头后，再把headers_in中的成员设置到将要向下游发送的r->headers_out结构体中
 	 */
 
 	if(u->state){
+		/*
+		 * ngx_http_upstream_state_t *state;
+		 * ngx_http_status_t status;
+		 * ngx_uint_t           code;
+		 */
+
 		u->state->status = ctx->status.code;
 	}
 
@@ -118,8 +124,14 @@ static ngx_int_t mytest_upstream_process_status_line(ngx_http_request_t *r){
 	u->headers_in.status_line.data = ngx_pcalloc(r->pool, len);
 	if(u->headers_in.status_line.data == NULL) return NGX_ERROR;
 
+	ngx_log_error(NGX_LOG_ERR,r->connection->log,0,"HHHH: ctx->status.start=%s",ctx->status.start);
+
 	ngx_memcpy(u->headers_in.status_line.data, ctx->status.start, len);
 
+	ngx_log_error_core(NGX_LOG_DEBUG,r->connection->log,0,"u->headers_in.status_line=%V",&u->headers_in.status_line);
+
+	//下一步将解析HTTP头部，设置process_header回调方法为mytest_upstream_process_header()
+	//即之后接受到的字符流将交给mytest_upstream_process_header()进行解析.
 	u->process_header = mytest_upstream_process_header;
 
 	return mytest_upstream_process_header(r);
