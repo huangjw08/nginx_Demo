@@ -1,0 +1,15 @@
+record stop
+delete display <display编号>
+
+tui模式下：
+ctrl+x-a ：进入或退出TUI
+ctrl+x-1 : 只显示1个窗口
+ctrl+x-2 : 显示2个窗口
+
+whatis <变量名>：查看这个变量的类型
+
+
+查看内存地址
+x /nfu <内存地址> //n表示显示的单元个数,f表示显示的格式，u表示每个单元的大小
+u: b:1bytes    h:2bytes   w:4bytes    g:8bytes
+

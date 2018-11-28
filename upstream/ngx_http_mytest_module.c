@@ -15,7 +15,7 @@ static void *mytest_create_loc_conf(ngx_conf_t *cf){
 	mycf->upstream.read_timeout = 60000;
 	mycf->upstream.store_access = 0600;
 
-	mycf->upstream.buffering = 0;
+	mycf->upstream.buffering = 0; //buffering为0时，表示以固定大小将后端服务器的响应 ---> 客户端
 	mycf->upstream.bufs.num = 8;
 	mycf->upstream.bufs.size = ngx_pagesize;
 	mycf->upstream.buffer_size = ngx_pagesize;
@@ -141,13 +141,20 @@ static ngx_int_t mytest_upstream_process_header(ngx_http_request_t *r){
 	ngx_int_t rc;
 	ngx_table_elt_t *h;
 	ngx_http_upstream_header_t *hh;
-	ngx_http_upstream_main_conf_t *umcf;
+	ngx_http_upstream_main_conf_t *umcf;//对将要转发给下游客户端的HTTP响应头部进行统一处理。该结构体中存储了需要进行统一处理的HTTP头部名称和回调方法。
 
 	umcf = ngx_http_get_module_main_conf(r, ngx_http_upstream_module);
 
+	//循环解析所有的HTTP头部
 	for(;;){
+		//HTTP框架提供的ngx_http_parse_header_line()，用于解析HTTP头部
 		rc = ngx_http_parse_header_line(r, &r->upstream->buffer, 1);
+		//返回NGX_OK时，表示解析出一行HTTP头部
 		if(rc == NGX_OK){
+			//向headers_in.headers这个ngx_list_t链表中添加HTTP头部
+			//ngx_list_push()该函数在给定的list的尾部追加一个元素,并返回指向新元素存放空间的指针。如果追加失败,则返回NULL
+
+			//========================================
 			h = ngx_list_push(&r->upstream->headers_in.headers);
 			if(h == NULL) return NGX_ERROR;
 
@@ -171,14 +178,21 @@ static ngx_int_t mytest_upstream_process_header(ngx_http_request_t *r){
 			}else{
 				ngx_strlow(h->lowcase_key, h->key.data, h->key.len);
 			}
+			//==============以上这段代码就是在设置ngx_table_elt_t中的各个成员=======================
 
+			//upstream模块对一些HTTP头部做特殊处理
 			hh = ngx_hash_find(&umcf->headers_in_hash, h->hash, h->lowcase_key, h->key.len);
 			if(hh && hh->handler(r, h, hh->offset)!=NGX_OK) return NGX_ERROR;
 
 			continue;
 		}
 
+
+		//表示响应中所有的HTTP头部都已解析完毕，接下来再接收到的就是HTTP包体
 		if(rc == NGX_HTTP_PARSE_HEADER_DONE){
+			/* 如果之前解析HTTP头部时没有发现server和date头部，那么下面会根据HTTP协议规范添加这两个头部
+			 *
+			 */
 			if(r->upstream->headers_in.server == NULL){
 				h = ngx_list_push(&r->upstream->headers_in.headers);
 				if(h == NULL) return NGX_ERROR;
@@ -218,23 +232,37 @@ static char *mytest(ngx_conf_t *cf, ngx_command_t *cmd, void *conf){
 	return NGX_CONF_OK;
 }
 
+
+
+//TODO debug mytest_handler()
 static ngx_int_t mytest_handler(ngx_http_request_t *r){
+	//首先建立HTTP上下文结构体ngx_http_mytest_ctx_t
 	mytest_ctx_t *myctx = ngx_http_get_module_ctx(r, ngx_http_mytest_module);
 	if(myctx == NULL){
 		myctx = ngx_pcalloc(r->pool, sizeof(mytest_ctx_t));
 		if(myctx == NULL) return NGX_ERROR;
+		//将新建的上下文与请求关联起来
 		ngx_http_set_ctx(r, myctx, ngx_http_mytest_module);
 	}
 
+	//通过HTTP框架提供好的ngx_http_upstream_create()方法来创建upstream
+	/*
+	 * 对每一个要使用upstream的请求，必须调用且只能调用1次ngx_http_upstream_create()，它会初始化r->upstream成员
+	 */
 	if(ngx_http_upstream_create(r)!=NGX_OK){
 		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "ngx_http_upstream_create() failed");
 		return NGX_ERROR;
 	}
 
+	//得到配置结构体ngx_http_mytest_conf_t
 	mytest_conf_t *mycf = (mytest_conf_t *)ngx_http_get_module_loc_conf(r, ngx_http_mytest_module);
-	ngx_http_upstream_t *u = r->upstream;
-	u->conf = &mycf->upstream;
+	ngx_http_upstream_t *u = r->upstream; //类型: ngx_http_upstream_t
+	u->conf = &mycf->upstream; // ngx_http_upstream_conf_t
+
+	//决定: 转发包体时使用的缓冲区
+	//在mytest_create_loc_conf()中已指定为0
 	u->buffering = mycf->upstream.buffering;
+
 
 	u->resolved = (ngx_http_upstream_resolved_t *) ngx_pcalloc(r->pool, sizeof(ngx_http_upstream_resolved_t));
 	if(u->resolved == NULL){
@@ -250,25 +278,31 @@ static ngx_int_t mytest_handler(ngx_http_request_t *r){
 		return NGX_ERROR;
 	}
 
+	//访问上游服务器的80端口
 	backendSockAddr.sin_family = AF_INET;
 	backendSockAddr.sin_port = htons((in_port_t)80);
 	char *pDmsIP = inet_ntoa(*(struct in_addr *)(pHost->h_addr_list[0]));
 	backendSockAddr.sin_addr.s_addr = inet_addr(pDmsIP);
 
+	//设置backendServer，存入"www.baidu.com"的IP地址字符串及长度
 	myctx->backendServer.data = (u_char *)pDmsIP;
 	myctx->backendServer.len = strlen(pDmsIP);
 
+	//将地址设置到resolved成员中,该成员用于设置上游服务器的地址
 	u->resolved->sockaddr = (struct sockaddr *)&backendSockAddr;
 	u->resolved->port = htons((in_port_t)80);
 	u->resolved->socklen = sizeof(struct sockaddr_in);
 	u->resolved->naddrs = 1;
 
+	//设置3个必须实现的回调方法
 	u->create_request = mytest_upstream_create_request;
 	u->process_header = mytest_upstream_process_status_line;
 	u->finalize_request = mytest_upstream_finalize_request;
 
 	r->main->count++;
 
+	//调用ngx_http_upstream_init()就是在启动upstream机制 书P161
 	ngx_http_upstream_init(r);
+	//必须返回NGX_DONE
 	return NGX_DONE;
 }
